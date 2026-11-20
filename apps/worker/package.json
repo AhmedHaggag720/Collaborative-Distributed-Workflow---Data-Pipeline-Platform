@@ -1,0 +1,24 @@
+{
+  "name": "@flowmesh/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@flowmesh/dag-engine": "workspace:*",
+    "@flowmesh/db": "workspace:*",
+    "@flowmesh/sandbox": "workspace:*",
+    "@flowmesh/schema": "workspace:*",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

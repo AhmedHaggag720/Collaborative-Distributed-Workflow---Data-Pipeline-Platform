@@ -1,0 +1,23 @@
+{
+  "name": "flowmesh",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FlowMesh — Collaborative Distributed Workflow & Data Pipeline Platform",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean",
+    "db:generate": "pnpm --filter @flowmesh/db db:generate",
+    "db:migrate": "pnpm --filter @flowmesh/db db:migrate",
+    "db:push": "pnpm --filter @flowmesh/db db:push",
+    "db:seed": "pnpm --filter @flowmesh/db db:seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.4",
+    "typescript": "^5.7.3",
+    "prettier": "^3.5.3"
+  }
+}

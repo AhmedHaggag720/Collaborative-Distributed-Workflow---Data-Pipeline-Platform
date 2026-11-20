@@ -1,0 +1,58 @@
+name: flowmesh-infra
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: flowmesh-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-flowmesh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flowmesh_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-flowmesh}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flowmesh} -d ${POSTGRES_DB:-flowmesh}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: flowmesh-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: flowmesh-timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TIMESCALE_USER:-flowmesh_telemetry}
+      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD:-flowmesh_telemetry_secret}
+      POSTGRES_DB: ${TIMESCALE_DB:-flowmesh_telemetry}
+    ports:
+      - "${TIMESCALE_PORT:-5433}:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TIMESCALE_USER:-flowmesh_telemetry} -d ${TIMESCALE_DB:-flowmesh_telemetry}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+  timescale_data:

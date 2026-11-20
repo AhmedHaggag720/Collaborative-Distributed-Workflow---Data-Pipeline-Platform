@@ -82,11 +82,11 @@ Follow these phases in order. Each phase ends with a concrete, verifiable milest
 
 ### Phase 0: Foundation & Monorepo Setup
 **Goal:** Establish a rock-solid developer experience with shared types and local infrastructure.
-- [ ] Initialize a `pnpm` workspace with `Turborepo` and strict `tsconfig.base.json`.
-- [ ] Create `infra/docker-compose.yml` spinning up PostgreSQL, Redis, and TimescaleDB (or ClickHouse).
-- [ ] Build `packages/schema` with Zod definitions for `Workflow`, `Node`, `Edge`, `ExecutionRun`, and `StepEvent`.
-- [ ] Set up database migrations (`Drizzle` or `Prisma` or raw SQL migrations) in `packages/db`.
-- [ ] **Milestone:** Running `docker compose up -d && pnpm dev` boots all services cleanly with shared hot-reloading types.
+- [x] Initialize a `pnpm` workspace with `Turborepo` and strict `tsconfig.base.json`.
+- [x] Create `infra/docker-compose.yml` spinning up PostgreSQL, Redis, and TimescaleDB (or ClickHouse).
+- [x] Build `packages/schema` with Zod definitions for `Workflow`, `Node`, `Edge`, `ExecutionRun`, and `StepEvent`.
+- [x] Set up database migrations (`Drizzle` or `Prisma` or raw SQL migrations) in `packages/db`.
+- [x] **Milestone:** Running `docker compose up -d && pnpm dev` boots all services cleanly with shared hot-reloading types.
 
 ---
 

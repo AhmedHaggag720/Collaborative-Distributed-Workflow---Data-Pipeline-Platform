@@ -1,0 +1,40 @@
+{
+  "name": "@flowmesh/db",
+  "version": "0.1.0",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "tsc --noEmit",
+    "clean": "rimraf dist",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/migrate.ts",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx src/seed.ts"
+  },
+  "dependencies": {
+    "@flowmesh/schema": "workspace:*",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.39.3",
+    "pg": "^8.13.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "@types/pg": "^8.11.11",
+    "drizzle-kit": "^0.30.4",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.6",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

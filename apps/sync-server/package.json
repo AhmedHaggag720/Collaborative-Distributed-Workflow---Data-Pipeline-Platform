@@ -1,0 +1,27 @@
+{
+  "name": "@flowmesh/sync-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.2",
+    "@fastify/websocket": "^11.0.2",
+    "@flowmesh/schema": "workspace:*",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "ws": "^8.18.0",
+    "yjs": "^13.6.23"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "@types/ws": "^8.5.14",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
