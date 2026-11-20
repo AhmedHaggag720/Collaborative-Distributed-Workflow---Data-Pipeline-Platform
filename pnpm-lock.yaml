@@ -236,6 +236,9 @@ importers:
       '@flowmesh/schema':
         specifier: workspace:*
         version: link:../schema
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
     devDependencies:
       '@types/node':
         specifier: ^22.13.4

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Node } from '@flowmesh/schema';
-import { X, Play, Trash2, Cpu, Globe, Radio, Code2, GitBranch, Clock } from 'lucide-react';
+import { X, Play, Trash2, Cpu, Globe, Radio, Code2, GitBranch, Clock, Maximize2 } from 'lucide-react';
+import { CodeEditorModal } from './CodeEditorModal';
 
 interface NodeConfigDrawerProps {
   node: Node | null;
@@ -15,6 +16,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
   onUpdateConfig,
   onDeleteNode,
 }) => {
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   if (!node) return null;
 
   const config = (node.data?.config as any) || {};
@@ -150,10 +152,17 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
 
         {node.type === 'js_code_transform' && (
           <div className="space-y-3">
+            <button
+              onClick={() => setIsEditorOpen(true)}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800/80 rounded-lg text-xs font-semibold transition shadow-sm"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+              Open V8 Code Studio
+            </button>
             <div>
-              <label className="block text-slate-400 mb-1 font-medium">V8 Sandboxed JavaScript Code</label>
+              <label className="block text-slate-400 mb-1 font-medium">JavaScript / TypeScript Code Preview</label>
               <textarea
-                rows={8}
+                rows={7}
                 value={config.code || ''}
                 onChange={(e) => handleConfigChange('code', e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-emerald-400 focus:outline-none focus:border-emerald-500 font-mono text-[11px] leading-relaxed resize-none"
@@ -228,6 +237,28 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
           Done
         </button>
       </div>
+
+      {/* Fullscreen Code Editor Studio Modal */}
+      {isEditorOpen && (
+        <CodeEditorModal
+          node={node}
+          isOpen={isEditorOpen}
+          onClose={() => setIsEditorOpen(false)}
+          onSave={(newCode, newTimeout, newMemory) => {
+            onUpdateConfig(node.id, {
+              data: {
+                ...node.data,
+                config: {
+                  ...config,
+                  code: newCode,
+                  timeoutMs: newTimeout,
+                  memoryLimitMb: newMemory,
+                },
+              } as any,
+            });
+          }}
+        />
+      )}
     </div>
   );
 };

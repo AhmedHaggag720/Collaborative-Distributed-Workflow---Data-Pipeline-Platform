@@ -127,13 +127,13 @@ Follow these phases in order. Each phase ends with a concrete, verifiable milest
 
 ### Phase 4: Sandboxed Multi-Tenant Code Execution
 **Goal:** Safely execute untrusted user-written JavaScript/TypeScript inside "JS Code Transform" nodes.
-- [ ] Build `packages/sandbox` using `esbuild` to transpile user TypeScript to plain JS on the fly (cache compiled bundles by content hash).
-- [ ] Execute compiled code inside `isolated-vm` V8 isolates with strict guardrails:
+- [x] Build `packages/sandbox` using `esbuild` to transpile user TypeScript to plain JS on the fly (cache compiled bundles by content hash).
+- [x] Execute compiled code inside `isolated-vm` V8 isolates with strict guardrails:
   - Memory limit (e.g., `128 MB`)
   - CPU execution timeout (e.g., `500 ms`)
-- [ ] Expose a controlled, safe host bridge into the isolate (e.g., structured `console.log` capture and a rate-limited `fetch` wrapper).
-- [ ] Add a code editor panel (Monaco Editor) in the frontend for editing Code Nodes with input/output payload previews.
-- [ ] **Milestone:** Run a workflow containing an intentional `while(true) {}` infinite loop and an out-of-memory allocation; verify the isolate terminates cleanly while the worker continues processing other jobs unaffected.
+- [x] Expose a controlled, safe host bridge into the isolate (e.g., structured `console.log` capture and a rate-limited `fetch` wrapper).
+- [x] Add a code editor panel (Monaco Editor) in the frontend for editing Code Nodes with input/output payload previews.
+- [x] **Milestone:** Run a workflow containing an intentional `while(true) {}` infinite loop and an out-of-memory allocation; verify the isolate terminates cleanly while the worker continues processing other jobs unaffected.
 
 ---
 
