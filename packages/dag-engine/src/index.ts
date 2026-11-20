@@ -1,5 +1,8 @@
 import type { Node, Edge } from '@flowmesh/schema';
 
+export * from './quadtree.js';
+export * from './layout.js';
+
 export interface GraphValidationResult {
   isValid: boolean;
   hasCycle: boolean;

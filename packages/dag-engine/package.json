@@ -16,6 +16,7 @@
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "lint": "tsc --noEmit",
+    "test": "tsx test/dag.test.ts",
     "clean": "rimraf dist"
   },
   "dependencies": {

@@ -92,13 +92,13 @@ Follow these phases in order. Each phase ends with a concrete, verifiable milest
 
 ### Phase 1: The Visual DAG Editor (Frontend Systems)
 **Goal:** Build a high-performance, interactive node-based editor in the browser.
-- [ ] Implement an infinite pan-and-zoom canvas (world-to-screen coordinate math + zoom-to-cursor).
-- [ ] Build core node types: **Webhook Trigger**, **HTTP Request**, **JS Code Transform**, **Conditional Branch**, and **Delay/Timer**.
-- [ ] Implement Bézier curve edge connections between input/output ports.
-- [ ] Build `packages/dag-engine` with real-time **cycle detection** (reject edges that create infinite loops) and **topological sorting**.
-- [ ] Add viewport culling and a Quadtree spatial index (or virtualized rendering) to maintain 60 FPS with 1,000+ nodes.
-- [ ] Offload auto-layout (e.g., Dagre/ELK) and JSON export calculations to a **Web Worker**.
-- [ ] **Milestone:** You can build, validate, pan/zoom, and export a complex branching workflow DAG smoothly in the browser.
+- [x] Implement an infinite pan-and-zoom canvas (world-to-screen coordinate math + zoom-to-cursor).
+- [x] Build core node types: **Webhook Trigger**, **HTTP Request**, **JS Code Transform**, **Conditional Branch**, and **Delay/Timer**.
+- [x] Implement Bézier curve edge connections between input/output ports.
+- [x] Build `packages/dag-engine` with real-time **cycle detection** (reject edges that create infinite loops) and **topological sorting**.
+- [x] Add viewport culling and a Quadtree spatial index (or virtualized rendering) to maintain 60 FPS with 1,000+ nodes.
+- [x] Offload auto-layout (e.g., Dagre/ELK) and JSON export calculations to a **Web Worker**.
+- [x] **Milestone:** You can build, validate, pan/zoom, and export a complex branching workflow DAG smoothly in the browser.
 
 ---
 
