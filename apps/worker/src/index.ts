@@ -1,10 +1,12 @@
 import os from 'os';
+import crypto from 'node:crypto';
 import * as dotenv from 'dotenv';
 import { db, executionSteps, executionRuns, workflows, workflowVersions, workerHeartbeats, eq, and, sql } from '@flowmesh/db';
 import { executeInSandbox } from '@flowmesh/sandbox';
 import { areDependenciesSatisfied, getDownstreamNodes } from '@flowmesh/dag-engine';
 import { calculateExponentialBackoffWithJitter } from './backoff.js';
 import { runReaperSweep } from './reaper.js';
+import { emitTelemetryEvent, generateTraceId, generateSpanId } from './telemetry.js';
 
 dotenv.config();
 
@@ -150,6 +152,25 @@ async function executeStep(step: any) {
   let logs: string[] = [];
   let activeBranchPort: string | null = null;
 
+  const traceId = generateTraceId();
+  const spanId = generateSpanId();
+
+  // Phase 5: Emit step_started telemetry event
+  await emitTelemetryEvent({
+    eventId: crypto.randomUUID(),
+    eventType: 'step_started',
+    runId: step.run_id,
+    workflowId: run.workflowId,
+    nodeId: step.node_id,
+    stepId: step.id,
+    status: 'running',
+    workerId,
+    traceId,
+    spanId,
+    timestamp: new Date().toISOString(),
+    inputPayload: step.input_payload,
+  });
+
   try {
     const inputData = step.input_payload || {};
 
@@ -231,6 +252,25 @@ async function executeStep(step: any) {
 
     console.log(`[Worker ${workerId}] Step ${step.id} completed successfully in ${durationMs}ms`);
 
+    // Phase 5: Emit step_completed telemetry event
+    await emitTelemetryEvent({
+      eventId: crypto.randomUUID(),
+      eventType: 'step_completed',
+      runId: step.run_id,
+      workflowId: run.workflowId,
+      nodeId: step.node_id,
+      stepId: step.id,
+      status: 'completed',
+      durationMs,
+      workerId,
+      traceId,
+      spanId,
+      timestamp: new Date().toISOString(),
+      outputPayload,
+      inputPayload: step.input_payload,
+      logs,
+    });
+
     // Downstream resolution (Fan-out / Fan-in)
     // Filter outgoing edges if this was a conditional branch
     const outgoingEdges = edges.filter((e) => {
@@ -307,6 +347,23 @@ async function executeStep(step: any) {
         .where(eq(executionSteps.id, step.id));
 
       console.log(`[Worker ${workerId}] Step ${step.id} scheduled for retry ${nextAttempt}/${step.max_attempts} at ${retryAt.toISOString()}`);
+
+      // Phase 5: Emit step_failed (retrying) telemetry event
+      await emitTelemetryEvent({
+        eventId: crypto.randomUUID(),
+        eventType: 'step_failed',
+        runId: step.run_id,
+        workflowId: run.workflowId,
+        nodeId: step.node_id,
+        stepId: step.id,
+        status: 'retrying',
+        workerId,
+        traceId,
+        spanId,
+        timestamp: new Date().toISOString(),
+        error: errorMsg,
+        logs,
+      });
     } else {
       // Permanently failed: route to Dead-Letter Queue (DLQ)
       await db
@@ -331,6 +388,23 @@ async function executeStep(step: any) {
         .where(eq(executionRuns.id, step.run_id));
 
       console.warn(`[Worker ${workerId}] Step ${step.id} routed to DLQ! Parent run ${step.run_id} marked as failed.`);
+
+      // Phase 5: Emit step_dlq telemetry event
+      await emitTelemetryEvent({
+        eventId: crypto.randomUUID(),
+        eventType: 'step_dlq',
+        runId: step.run_id,
+        workflowId: run.workflowId,
+        nodeId: step.node_id,
+        stepId: step.id,
+        status: 'dlq',
+        workerId,
+        traceId,
+        spanId,
+        timestamp: new Date().toISOString(),
+        error: errorMsg,
+        logs,
+      });
     }
   } finally {
     activeJobs--;

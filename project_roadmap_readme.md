@@ -139,12 +139,12 @@ Follow these phases in order. Each phase ends with a concrete, verifiable milest
 
 ### Phase 5: Streaming Analytics & Live Observability
 **Goal:** Stream live execution traces and performance metrics directly onto the visual graph.
-- [ ] Instrument `apps/api` and `apps/worker` with **OpenTelemetry** to propagate trace IDs across asynchronous worker hops.
-- [ ] Ingest step-level execution logs, durations, and status codes into **TimescaleDB** or **ClickHouse** (batched writes for high throughput).
-- [ ] Build a **Server-Sent Events (SSE)** endpoint in `apps/api` that subscribes to Redis Pub/Sub execution events and pushes live updates to the browser.
-- [ ] Render live visual feedback directly on canvas nodes: pulsing active state, green/red completion badges, and real-time latency (p95) overlays.
-- [ ] Build an Execution Inspector drawer allowing users to click any node in a past run to inspect its exact input/output JSON payloads and captured `console.log` lines.
-- [ ] **Milestone:** Trigger a workflow and watch nodes light up in real time on the canvas as distributed workers process them, then click a failed node to inspect its stack trace and replay it.
+- [x] Instrument `apps/api` and `apps/worker` with **OpenTelemetry** to propagate trace IDs across asynchronous worker hops.
+- [x] Ingest step-level execution logs, durations, and status codes into **TimescaleDB** or **ClickHouse** (batched writes for high throughput).
+- [x] Build a **Server-Sent Events (SSE)** endpoint in `apps/api` that subscribes to Redis Pub/Sub execution events and pushes live updates to the browser.
+- [x] Render live visual feedback directly on canvas nodes: pulsing active state, green/red completion badges, and real-time latency (p95) overlays.
+- [x] Build an Execution Inspector drawer allowing users to click any node in a past run to inspect its exact input/output JSON payloads and captured `console.log` lines.
+- [x] **Milestone:** Trigger a workflow and watch nodes light up in real time on the canvas as distributed workers process them, then click a failed node to inspect its stack trace and replay it.
 
 ---
 

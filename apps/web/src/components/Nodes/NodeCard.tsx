@@ -6,10 +6,12 @@ import {
   Code2, 
   GitBranch, 
   Clock, 
-  MoreVertical, 
   Trash2,
   Copy,
-  Zap
+  Zap,
+  CheckCircle2,
+  AlertCircle,
+  Activity
 } from 'lucide-react';
 
 interface NodeCardProps {
@@ -17,7 +19,15 @@ interface NodeCardProps {
   isSelected: boolean;
   isActive: boolean;
   peerSelection?: { name: string; color: string };
+  telemetry?: {
+    status: 'running' | 'completed' | 'failed' | 'retrying' | 'dlq';
+    durationMs?: number;
+  };
+  metric?: {
+    p95?: number;
+  };
   onSelect: (nodeId: string) => void;
+  onInspectStep?: (nodeId: string) => void;
   onStartConnect: (nodeId: string, portId: string, clientPos: { x: number; y: number }) => void;
   onEndConnect: (nodeId: string, portId: string) => void;
   onDeleteNode: (nodeId: string) => void;
@@ -29,7 +39,10 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   isSelected,
   isActive,
   peerSelection,
+  telemetry,
+  metric,
   onSelect,
+  onInspectStep,
   onStartConnect,
   onEndConnect,
   onDeleteNode,
@@ -75,14 +88,28 @@ export const NodeCard: React.FC<NodeCardProps> = ({
 
   const config = node.data?.config as any;
 
+  // Visual status indicators for telemetry
+  const isRunning = telemetry?.status === 'running';
+  const isCompleted = telemetry?.status === 'completed';
+  const isFailed = telemetry?.status === 'failed' || telemetry?.status === 'dlq';
+
   return (
     <div
       onClick={(e) => {
         e.stopPropagation();
         onSelect(node.id);
+        if (onInspectStep && telemetry) {
+          onInspectStep(node.id);
+        }
       }}
       className={`absolute rounded-xl bg-[#0F172A]/95 border shadow-xl backdrop-blur-md transition-all duration-150 select-none cursor-move ${
-        isActive
+        isRunning
+          ? 'border-cyan-400 ring-4 ring-cyan-500/40 shadow-cyan-500/50 animate-pulse'
+          : isCompleted
+          ? 'border-emerald-500/80 ring-2 ring-emerald-500/30'
+          : isFailed
+          ? 'border-rose-500/90 ring-4 ring-rose-500/30 shadow-rose-500/30'
+          : isActive
           ? 'border-emerald-400 ring-4 ring-emerald-500/20 shadow-emerald-500/40'
           : peerSelection
           ? 'ring-2 shadow-lg'
@@ -105,6 +132,34 @@ export const NodeCard: React.FC<NodeCardProps> = ({
           {peerSelection.name} editing
         </div>
       )}
+
+      {/* Latency & Telemetry Overlays */}
+      <div className="absolute -top-4 right-2 flex items-center gap-1.5 pointer-events-none">
+        {metric?.p95 !== undefined && metric.p95 > 0 && (
+          <span className="bg-slate-900 border border-slate-700 text-amber-400 text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded-full shadow-md flex items-center gap-0.5">
+            ⚡ {metric.p95}ms p95
+          </span>
+        )}
+        {isRunning && (
+          <span className="bg-cyan-950 border border-cyan-500/50 text-cyan-300 text-[9px] font-mono px-1.5 py-0.5 rounded-full shadow-md flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping inline-block" />
+            RUNNING
+          </span>
+        )}
+        {isCompleted && (
+          <span className="bg-emerald-950 border border-emerald-500/50 text-emerald-300 text-[9px] font-mono px-1.5 py-0.5 rounded-full shadow-md flex items-center gap-1">
+            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+            {telemetry.durationMs !== undefined ? `${telemetry.durationMs}ms` : 'DONE'}
+          </span>
+        )}
+        {isFailed && (
+          <span className="bg-rose-950 border border-rose-500/50 text-rose-300 text-[9px] font-mono px-1.5 py-0.5 rounded-full shadow-md flex items-center gap-1">
+            <AlertCircle className="w-2.5 h-2.5 text-rose-400" />
+            {telemetry?.status === 'dlq' ? 'DLQ' : 'ERR'}
+          </span>
+        )}
+      </div>
+
       {/* Node Header */}
       <div className="p-3 pb-2 flex items-center justify-between border-b border-slate-800/80">
         <div className="flex items-center gap-2">

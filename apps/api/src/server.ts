@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
 import * as dotenv from 'dotenv';
+import { Redis } from 'ioredis';
 import { db, workflows, workflowVersions, executionRuns, executionSteps, eq, desc, and } from '@flowmesh/db';
 import { CreateWorkflowSchema, UpdateWorkflowSchema } from '@flowmesh/schema';
 import { validateDAG, findRootNodes } from '@flowmesh/dag-engine';
@@ -10,6 +11,32 @@ dotenv.config();
 
 const port = Number(process.env.PORT_API || 4000);
 const host = '0.0.0.0';
+
+// Live Telemetry SSE Client Stream Registry
+const sseClients = new Set<any>();
+
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+let redisSub: Redis | null = null;
+
+try {
+  redisSub = new Redis(redisUrl, { retryStrategy: () => 3000, maxRetriesPerRequest: 1 });
+  redisSub.subscribe('flowmesh:telemetry:events', (err) => {
+    if (err) console.warn('[API Telemetry] Subscription warning:', err.message);
+  });
+  redisSub.on('message', (channel, message) => {
+    if (channel === 'flowmesh:telemetry:events') {
+      for (const client of sseClients) {
+        try {
+          client.write(`event: telemetry\ndata: ${message}\n\n`);
+        } catch {
+          sseClients.delete(client);
+        }
+      }
+    }
+  });
+} catch {
+  console.warn('[API Telemetry] Running without Redis subscriber');
+}
 
 export async function buildServer() {
   const server = Fastify({
@@ -353,6 +380,96 @@ export async function buildServer() {
     return { data: { ...run, steps } };
   });
 
+  // Get specific step execution details (input/output payload, logs, trace)
+  server.get('/api/runs/:runId/steps/:nodeId', async (req, reply) => {
+    const { runId, nodeId } = req.params as { runId: string; nodeId: string };
+    const [step] = await db
+      .select()
+      .from(executionSteps)
+      .where(and(eq(executionSteps.runId, runId), eq(executionSteps.nodeId, nodeId)))
+      .orderBy(desc(executionSteps.createdAt))
+      .limit(1);
+
+    if (!step) {
+      return reply.notFound(`Step for node ${nodeId} in run ${runId} not found.`);
+    }
+
+    return { data: step };
+  });
+
+  // Get Node Performance & Latency Metrics (p50, p95, p99, error rates)
+  server.get('/api/telemetry/metrics/:workflowId', async (req) => {
+    const { workflowId } = req.params as { workflowId: string };
+    const runs = await db
+      .select({ id: executionRuns.id })
+      .from(executionRuns)
+      .where(eq(executionRuns.workflowId, workflowId));
+
+    const runIds = runs.map((r) => r.id);
+    if (runIds.length === 0) {
+      return { data: {} };
+    }
+
+    const allSteps = await db.select().from(executionSteps);
+    const relevantSteps = allSteps.filter((s) => runIds.includes(s.runId));
+
+    const metricsByNode: Record<
+      string,
+      {
+        nodeId: string;
+        totalRuns: number;
+        completed: number;
+        failed: number;
+        p50: number;
+        p95: number;
+        p99: number;
+        avgDuration: number;
+      }
+    > = {};
+
+    const durationsByNode: Record<string, number[]> = {};
+
+    for (const step of relevantSteps) {
+      if (!metricsByNode[step.nodeId]) {
+        metricsByNode[step.nodeId] = {
+          nodeId: step.nodeId,
+          totalRuns: 0,
+          completed: 0,
+          failed: 0,
+          p50: 0,
+          p95: 0,
+          p99: 0,
+          avgDuration: 0,
+        };
+        durationsByNode[step.nodeId] = [];
+      }
+
+      const m = metricsByNode[step.nodeId];
+      m.totalRuns++;
+      if (step.status === 'completed') m.completed++;
+      if (step.status === 'failed' || step.status === 'dlq') m.failed++;
+      if (step.durationMs !== null && step.durationMs !== undefined) {
+        durationsByNode[step.nodeId].push(step.durationMs);
+      }
+    }
+
+    for (const [nodeId, durations] of Object.entries(durationsByNode)) {
+      if (durations.length > 0) {
+        durations.sort((a, b) => a - b);
+        const m = metricsByNode[nodeId];
+        const p50Idx = Math.floor(durations.length * 0.5);
+        const p95Idx = Math.floor(durations.length * 0.95);
+        const p99Idx = Math.floor(durations.length * 0.99);
+        m.p50 = durations[p50Idx] ?? 0;
+        m.p95 = durations[p95Idx] ?? durations[durations.length - 1];
+        m.p99 = durations[p99Idx] ?? durations[durations.length - 1];
+        m.avgDuration = Math.round(durations.reduce((acc, d) => acc + d, 0) / durations.length);
+      }
+    }
+
+    return { data: metricsByNode };
+  });
+
   // Server-Sent Events (SSE) Live Telemetry Stream
   server.get('/api/telemetry/stream', async (req, reply) => {
     reply.raw.setHeader('Content-Type', 'text/event-stream');
@@ -361,13 +478,20 @@ export async function buildServer() {
     reply.raw.setHeader('Access-Control-Allow-Origin', '*');
 
     reply.raw.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected', time: new Date() })}\n\n`);
+    sseClients.add(reply.raw);
 
-    const interval = setInterval(() => {
-      reply.raw.write(`event: ping\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`);
+    const pingInterval = setInterval(() => {
+      try {
+        reply.raw.write(`event: ping\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`);
+      } catch {
+        clearInterval(pingInterval);
+        sseClients.delete(reply.raw);
+      }
     }, 15000);
 
     req.raw.on('close', () => {
-      clearInterval(interval);
+      clearInterval(pingInterval);
+      sseClients.delete(reply.raw);
     });
   });
 

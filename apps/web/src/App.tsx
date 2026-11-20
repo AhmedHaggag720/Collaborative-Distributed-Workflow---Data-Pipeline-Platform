@@ -35,6 +35,8 @@ import { MiniMap } from './components/Canvas/MiniMap';
 import { PresenceCursors } from './components/Multiplayer/PresenceCursors';
 import { PeerBadges } from './components/Multiplayer/PeerBadges';
 import { useYjsRoom } from './lib/yjs/useYjsRoom';
+import { useLiveTelemetry } from './lib/telemetry/useLiveTelemetry';
+import { ExecutionInspectorDrawer } from './components/Inspector/ExecutionInspectorDrawer';
 import type { ConnectionDraft, DragItem } from './types/canvas';
 
 const demoSeedNodes: Node[] = [
@@ -212,6 +214,18 @@ export default function App() {
   const [lastPanMouse, setLastPanMouse] = useState<{ x: number; y: number } | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'error' | 'success' | 'info' } | null>(null);
   const [fps, setFps] = useState(60);
+  const [inspectingNodeId, setInspectingNodeId] = useState<string | null>(null);
+
+  // Phase 5: Live Telemetry & Metrics Hook
+  const {
+    isConnected: isTelemetryConnected,
+    nodeStatuses,
+    metrics: telemetryMetrics,
+    activeRunId,
+    eventCount,
+    triggerWorkflowRun,
+    replayDlqStep,
+  } = useLiveTelemetry('workflow-demo-1');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -624,7 +638,19 @@ export default function App() {
     showToast('Workflow execution completed with 100% success!', 'success');
   };
 
+  const handleTriggerWorkerRun = async () => {
+    showToast('Triggering workflow run on distributed worker fleet...', 'info');
+    const result = await triggerWorkflowRun();
+    if (result) {
+      showToast(`Workflow execution triggered! Run ID: ${result.runId?.substring(0, 8)}...`, 'success');
+    } else {
+      showToast('Worker API offline: running local canvas simulation', 'info');
+      simulateRun();
+    }
+  };
+
   const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedNodeId) || null, [nodes, selectedNodeId]);
+  const inspectingNode = useMemo(() => nodes.find((n) => n.id === inspectingNodeId) || null, [nodes, inspectingNodeId]);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#0B0F19] text-slate-100 overflow-hidden font-sans select-none">
@@ -695,6 +721,13 @@ export default function App() {
 
         {/* Right Actions: Multiplayer Presence & Run */}
         <div className="flex items-center gap-3">
+          {/* SSE Live Telemetry Indicator */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono">
+            <span className={`w-2 h-2 rounded-full ${isTelemetryConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+            <span className="text-slate-300">SSE: {isTelemetryConnected ? 'Live' : 'Offline'}</span>
+            {eventCount > 0 && <span className="text-cyan-400 font-bold font-mono">({eventCount})</span>}
+          </div>
+
           <PeerBadges
             peers={peers}
             currentUser={currentUser}
@@ -720,7 +753,7 @@ export default function App() {
             </button>
 
             <button
-              onClick={simulateRun}
+              onClick={handleTriggerWorkerRun}
               disabled={isExecuting || !validation.isValid}
               className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-lg text-xs font-semibold shadow-md transition disabled:opacity-50"
             >
@@ -797,10 +830,13 @@ export default function App() {
                   isSelected={selectedNodeId === node.id}
                   isActive={activeStepId === node.id}
                   peerSelection={peerWithSelection ? { name: peerWithSelection.name, color: peerWithSelection.color } : undefined}
+                  telemetry={nodeStatuses[node.id]}
+                  metric={telemetryMetrics[node.id]}
                   onSelect={(id) => {
                     setSelectedNodeId(id);
                     broadcastAwareness(null, id);
                   }}
+                  onInspectStep={(id) => setInspectingNodeId(id)}
                   onStartConnect={handleStartConnect}
                   onEndConnect={handleEndConnect}
                   onDeleteNode={deleteYNode}
@@ -873,6 +909,18 @@ export default function App() {
           }}
           onUpdateConfig={updateYNode}
           onDeleteNode={deleteYNode}
+        />
+
+        <ExecutionInspectorDrawer
+          isOpen={Boolean(inspectingNodeId)}
+          onClose={() => setInspectingNodeId(null)}
+          nodeName={inspectingNode?.data?.label || inspectingNodeId || 'Node'}
+          nodeType={inspectingNode?.type || 'node'}
+          telemetryState={inspectingNodeId ? nodeStatuses[inspectingNodeId] : undefined}
+          onReplayStep={async (stepId) => {
+            await replayDlqStep(stepId);
+            showToast('Replayed step from DLQ!', 'success');
+          }}
         />
 
         {toastMessage && (

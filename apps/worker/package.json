@@ -14,7 +14,8 @@
     "@flowmesh/db": "workspace:*",
     "@flowmesh/sandbox": "workspace:*",
     "@flowmesh/schema": "workspace:*",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "ioredis": "^5.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",

@@ -16,7 +16,8 @@
     "@flowmesh/db": "workspace:*",
     "@flowmesh/schema": "workspace:*",
     "dotenv": "^16.4.7",
-    "fastify": "^5.2.1"
+    "fastify": "^5.2.1",
+    "ioredis": "^5.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
