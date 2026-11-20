@@ -6,6 +6,7 @@ import { Redis } from 'ioredis';
 import { db, workflows, workflowVersions, executionRuns, executionSteps, eq, desc, and } from '@flowmesh/db';
 import { CreateWorkflowSchema, UpdateWorkflowSchema } from '@flowmesh/schema';
 import { validateDAG, findRootNodes } from '@flowmesh/dag-engine';
+import { TokenBucketRateLimiter } from './rate-limiter.js';
 
 dotenv.config();
 
@@ -17,9 +18,11 @@ const sseClients = new Set<any>();
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 let redisSub: Redis | null = null;
+let rateLimiter: TokenBucketRateLimiter = new TokenBucketRateLimiter(null);
 
 try {
   redisSub = new Redis(redisUrl, { retryStrategy: () => 3000, maxRetriesPerRequest: 1 });
+  rateLimiter = new TokenBucketRateLimiter(redisSub);
   redisSub.subscribe('flowmesh:telemetry:events', (err) => {
     if (err) console.warn('[API Telemetry] Subscription warning:', err.message);
   });
@@ -234,6 +237,24 @@ export async function buildServer() {
   // Webhook Ingress (Triggers workflow execution)
   server.post('/hooks/:workflowId', async (req, reply) => {
     const { workflowId } = req.params as { workflowId: string };
+
+    // Phase 6: Per-tenant Token Bucket Rate Limiting (100 capacity, 20 refills/sec)
+    const tenantId = (req.headers['x-tenant-id'] as string) || workflowId;
+    const rateCheck = await rateLimiter.consume(`tenant:${tenantId}`, {
+      capacity: 100,
+      refillPerSecond: 20,
+    });
+
+    reply.header('X-RateLimit-Remaining', rateCheck.remaining);
+
+    if (!rateCheck.allowed) {
+      return reply.status(429).send({
+        error: 'Too Many Requests',
+        message: `Rate limit exceeded for tenant ${tenantId}. Token bucket exhausted.`,
+        remainingTokens: rateCheck.remaining,
+      });
+    }
+
     const [workflow] = await db.select().from(workflows).where(eq(workflows.id, workflowId));
 
     if (!workflow) {

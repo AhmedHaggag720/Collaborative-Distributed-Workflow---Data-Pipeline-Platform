@@ -7,6 +7,7 @@ import { areDependenciesSatisfied, getDownstreamNodes } from '@flowmesh/dag-engi
 import { calculateExponentialBackoffWithJitter } from './backoff.js';
 import { runReaperSweep } from './reaper.js';
 import { emitTelemetryEvent, generateTraceId, generateSpanId } from './telemetry.js';
+import { getCircuitBreakerForUrl } from './circuit-breaker.js';
 
 dotenv.config();
 
@@ -191,24 +192,34 @@ async function executeStep(step: any) {
       const url = config.url;
       logs.push(`[HTTP] Dispatching ${config.method || 'GET'} to ${url}`);
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 8000);
+      const breaker = getCircuitBreakerForUrl(url, {
+        failureThreshold: config.failureThreshold || 5,
+        resetTimeoutMs: config.resetTimeoutMs || 15000,
+      });
 
-      try {
-        const resp = await fetch(url, {
-          method: config.method || 'GET',
-          headers: config.headers || { 'Content-Type': 'application/json' },
-          body: config.method !== 'GET' ? JSON.stringify(inputData) : undefined,
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        const text = await resp.text();
-        outputPayload = { status: resp.status, body: text.slice(0, 2000) };
-        logs.push(`[HTTP] Response status: ${resp.status}`);
-      } catch (httpErr) {
-        clearTimeout(timeout);
-        throw new Error(`HTTP dispatch failed: ${(httpErr as Error).message}`);
-      }
+      outputPayload = await breaker.execute(async () => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 8000);
+
+        try {
+          const resp = await fetch(url, {
+            method: config.method || 'GET',
+            headers: config.headers || { 'Content-Type': 'application/json' },
+            body: config.method !== 'GET' ? JSON.stringify(inputData) : undefined,
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+          if (!resp.ok && resp.status >= 500) {
+            throw new Error(`Upstream server returned HTTP ${resp.status}`);
+          }
+          const text = await resp.text();
+          logs.push(`[HTTP] Response status: ${resp.status}`);
+          return { status: resp.status, body: text.slice(0, 2000) };
+        } catch (httpErr) {
+          clearTimeout(timeout);
+          throw new Error(`HTTP dispatch failed: ${(httpErr as Error).message}`);
+        }
+      });
     } else if (node.type === 'conditional_branch') {
       const expr = node.data?.config?.conditionExpression || 'return Boolean(input);';
       logs.push(`[Branch] Evaluating condition: ${expr}`);

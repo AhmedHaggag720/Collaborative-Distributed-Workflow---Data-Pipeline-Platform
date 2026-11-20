@@ -150,14 +150,14 @@ Follow these phases in order. Each phase ends with a concrete, verifiable milest
 
 ### Phase 6: Production Hardening, Load Testing & Showcase
 **Goal:** Prove system resilience under stress and polish the project for senior engineering reviews.
-- [ ] Implement per-tenant **Token Bucket Rate Limiting** using atomic **Redis Lua scripts** on webhook ingress and outbound HTTP nodes.
-- [ ] Add a **Circuit Breaker** for outbound HTTP nodes so a failing third-party API fails fast instead of clogging worker pools.
-- [ ] Write `k6` load tests in `infra/load-tests/` to benchmark:
+- [x] Implement per-tenant **Token Bucket Rate Limiting** using atomic **Redis Lua scripts** on webhook ingress and outbound HTTP nodes.
+- [x] Add a **Circuit Breaker** for outbound HTTP nodes so a failing third-party API fails fast instead of clogging worker pools.
+- [x] Write `k6` load tests in `infra/load-tests/` to benchmark:
   - Webhook ingestion throughput (requests/sec)
   - End-to-end execution latency (p50, p95, p99)
   - WebSocket multiplayer sync latency under concurrent editors
-- [ ] Document key architectural trade-offs (ADRs — Architecture Decision Records) in a `/docs` folder.
-- [ ] Record a 3-minute architecture walkthrough & live demo (showing multiplayer editing + chaos worker kill + live telemetry).
+- [x] Document key architectural trade-offs (ADRs — Architecture Decision Records) in a `/docs` folder.
+- [x] Record a 3-minute architecture walkthrough & live demo (showing multiplayer editing + chaos worker kill + live telemetry).
 
 ---
 
