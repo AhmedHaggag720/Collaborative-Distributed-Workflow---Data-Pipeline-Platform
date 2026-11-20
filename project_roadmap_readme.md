@@ -104,12 +104,12 @@ Follow these phases in order. Each phase ends with a concrete, verifiable milest
 
 ### Phase 2: Real-Time Multiplayer & Local-First Sync
 **Goal:** Turn the single-player editor into a Figma-like collaborative workspace that works offline.
-- [ ] Bind the DAG graph state (nodes, positions, edges, node configs) to a **Yjs** `Y.Doc` (`Y.Map` structures).
-- [ ] Wire up `y-indexeddb` so workflows load instantaneously from browser storage and remain editable offline.
-- [ ] Build `apps/sync-server` to sync Yjs updates over WebSockets and persist compacted binary snapshots to PostgreSQL.
-- [ ] Connect `apps/sync-server` instances via **Redis Pub/Sub** so users on different server instances stay in sync.
-- [ ] Add live multiplayer presence: colored user cursors, active node selection highlights, and per-user **Yjs UndoManager** (undoing only your own edits).
-- [ ] **Milestone:** Open two browser tabs (and kill the network in one); edit both simultaneously, reconnect, and watch changes merge without conflicts.
+- [x] Bind the DAG graph state (nodes, positions, edges, node configs) to a **Yjs** `Y.Doc` (`Y.Map` structures).
+- [x] Wire up `y-indexeddb` so workflows load instantaneously from browser storage and remain editable offline.
+- [x] Build `apps/sync-server` to sync Yjs updates over WebSockets and persist compacted binary snapshots to PostgreSQL.
+- [x] Connect `apps/sync-server` instances via **Redis Pub/Sub** so users on different server instances stay in sync.
+- [x] Add live multiplayer presence: colored user cursors, active node selection highlights, and per-user **Yjs UndoManager** (undoing only your own edits).
+- [x] **Milestone:** Open two browser tabs (and kill the network in one); edit both simultaneously, reconnect, and watch changes merge without conflicts.
 
 ---
 

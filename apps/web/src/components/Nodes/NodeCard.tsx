@@ -16,6 +16,7 @@ interface NodeCardProps {
   node: Node;
   isSelected: boolean;
   isActive: boolean;
+  peerSelection?: { name: string; color: string };
   onSelect: (nodeId: string) => void;
   onStartConnect: (nodeId: string, portId: string, clientPos: { x: number; y: number }) => void;
   onEndConnect: (nodeId: string, portId: string) => void;
@@ -27,6 +28,7 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   node,
   isSelected,
   isActive,
+  peerSelection,
   onSelect,
   onStartConnect,
   onEndConnect,
@@ -79,18 +81,30 @@ export const NodeCard: React.FC<NodeCardProps> = ({
         e.stopPropagation();
         onSelect(node.id);
       }}
-      style={{
-        transform: `translate(${node.position.x}px, ${node.position.y}px)`,
-        width: `${node.width || 240}px`,
-      }}
       className={`absolute rounded-xl bg-[#0F172A]/95 border shadow-xl backdrop-blur-md transition-all duration-150 select-none cursor-move ${
         isActive
           ? 'border-emerald-400 ring-4 ring-emerald-500/20 shadow-emerald-500/40'
+          : peerSelection
+          ? 'ring-2 shadow-lg'
           : isSelected
           ? 'border-indigo-400 ring-2 ring-indigo-500/30 shadow-indigo-500/30'
           : 'border-slate-800 hover:border-slate-700 hover:shadow-2xl'
       }`}
+      style={{
+        transform: `translate(${node.position.x}px, ${node.position.y}px)`,
+        width: `${node.width || 240}px`,
+        borderColor: peerSelection ? peerSelection.color : undefined,
+      }}
     >
+      {/* Peer selection tag */}
+      {peerSelection && (
+        <div
+          style={{ backgroundColor: peerSelection.color }}
+          className="absolute -top-5 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-950 uppercase shadow-md"
+        >
+          {peerSelection.name} editing
+        </div>
+      )}
       {/* Node Header */}
       <div className="p-3 pb-2 flex items-center justify-between border-b border-slate-800/80">
         <div className="flex items-center gap-2">
