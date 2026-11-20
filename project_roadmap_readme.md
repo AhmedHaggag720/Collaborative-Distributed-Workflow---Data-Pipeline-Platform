@@ -115,13 +115,13 @@ Follow these phases in order. Each phase ends with a concrete, verifiable milest
 
 ### Phase 3: Distributed Execution Engine (Backend Core)
 **Goal:** Build a fault-tolerant worker fleet that executes deployed workflows reliably.
-- [ ] Implement workflow publishing/versioning (immutable snapshots of the DAG stored in PostgreSQL).
-- [ ] Build a Webhook Trigger endpoint (`POST /hooks/:workflowId`) that creates an `execution_run` and enqueues the root node(s).
-- [ ] Implement concurrent worker job leasing in PostgreSQL using `SELECT ... FOR UPDATE SKIP LOCKED` with lease expiration timestamps.
-- [ ] Build the DAG runner loop: when a node finishes, persist its output payload, check downstream dependencies (fan-out / fan-in), and enqueue ready child nodes.
-- [ ] Implement **worker heartbeats** and a **reaper process** that reclaims orphaned jobs if a worker process crashes mid-execution.
-- [ ] Add **exponential backoff with full jitter** for failed steps and route permanently failed jobs to a **Dead-Letter Queue (DLQ)** with a manual replay endpoint.
-- [ ] **Milestone:** Trigger 500 concurrent workflow runs across 3 running worker instances, `kill -9` one worker mid-run, and verify 100% of runs complete with zero lost steps.
+- [x] Implement workflow publishing/versioning (immutable snapshots of the DAG stored in PostgreSQL).
+- [x] Build a Webhook Trigger endpoint (`POST /hooks/:workflowId`) that creates an `execution_run` and enqueues the root node(s).
+- [x] Implement concurrent worker job leasing in PostgreSQL using `SELECT ... FOR UPDATE SKIP LOCKED` with lease expiration timestamps.
+- [x] Build the DAG runner loop: when a node finishes, persist its output payload, check downstream dependencies (fan-out / fan-in), and enqueue ready child nodes.
+- [x] Implement **worker heartbeats** and a **reaper process** that reclaims orphaned jobs if a worker process crashes mid-execution.
+- [x] Add **exponential backoff with full jitter** for failed steps and route permanently failed jobs to a **Dead-Letter Queue (DLQ)** with a manual replay endpoint.
+- [x] **Milestone:** Trigger 500 concurrent workflow runs across 3 running worker instances, `kill -9` one worker mid-run, and verify 100% of runs complete with zero lost steps.
 
 ---
 

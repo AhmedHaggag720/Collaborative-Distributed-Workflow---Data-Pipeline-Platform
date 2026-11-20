@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
 import * as dotenv from 'dotenv';
-import { db, workflows, executionRuns, executionSteps, eq, desc } from '@flowmesh/db';
+import { db, workflows, workflowVersions, executionRuns, executionSteps, eq, desc, and } from '@flowmesh/db';
 import { CreateWorkflowSchema, UpdateWorkflowSchema } from '@flowmesh/schema';
 import { validateDAG, findRootNodes } from '@flowmesh/dag-engine';
 
@@ -121,6 +121,89 @@ export async function buildServer() {
     return { data: updated };
   });
 
+  // Workflow Publishing & Versioning (Immutable snapshots)
+  server.post('/api/workflows/:id/publish', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const [workflow] = await db.select().from(workflows).where(eq(workflows.id, id));
+
+    if (!workflow) {
+      return reply.notFound(`Workflow ${id} not found.`);
+    }
+
+    const nextVersion = (workflow.version || 1) + 1;
+
+    // Create immutable snapshot in workflow_versions
+    const [versionSnapshot] = await db
+      .insert(workflowVersions)
+      .values({
+        workflowId: workflow.id,
+        versionNumber: workflow.version || 1,
+        snapshot: {
+          nodes: workflow.nodes,
+          edges: workflow.edges,
+          viewport: workflow.viewport,
+        },
+        publishedAt: new Date(),
+        publishedBy: (req.headers['x-user-id'] as string) || 'system',
+      })
+      .returning();
+
+    // Mark current workflow as published and increment draft version
+    await db
+      .update(workflows)
+      .set({
+        isPublished: true,
+        version: nextVersion,
+        updatedAt: new Date(),
+      })
+      .where(eq(workflows.id, id));
+
+    return reply.status(201).send({
+      message: `Workflow published successfully as version ${versionSnapshot.versionNumber}`,
+      data: versionSnapshot,
+    });
+  });
+
+  server.get('/api/workflows/:id/versions', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const versions = await db
+      .select()
+      .from(workflowVersions)
+      .where(eq(workflowVersions.workflowId, id))
+      .orderBy(desc(workflowVersions.versionNumber));
+
+    return { data: versions };
+  });
+
+  server.post('/api/workflows/:id/rollback/:versionId', async (req, reply) => {
+    const { id, versionId } = req.params as { id: string; versionId: string };
+    const [targetVersion] = await db
+      .select()
+      .from(workflowVersions)
+      .where(and(eq(workflowVersions.id, versionId), eq(workflowVersions.workflowId, id)));
+
+    if (!targetVersion) {
+      return reply.notFound(`Version ${versionId} for workflow ${id} not found.`);
+    }
+
+    const snapshot = targetVersion.snapshot as any;
+    const [restored] = await db
+      .update(workflows)
+      .set({
+        nodes: snapshot.nodes || [],
+        edges: snapshot.edges || [],
+        viewport: snapshot.viewport || { x: 0, y: 0, zoom: 1 },
+        updatedAt: new Date(),
+      })
+      .where(eq(workflows.id, id))
+      .returning();
+
+    return {
+      message: `Workflow restored to version ${targetVersion.versionNumber}`,
+      data: restored,
+    };
+  });
+
   // Webhook Ingress (Triggers workflow execution)
   server.post('/hooks/:workflowId', async (req, reply) => {
     const { workflowId } = req.params as { workflowId: string };
@@ -130,22 +213,41 @@ export async function buildServer() {
       return reply.notFound(`Workflow ${workflowId} not found.`);
     }
 
-    const nodes = workflow.nodes as any[];
-    const edges = workflow.edges as any[];
+    // Check if there is an active published version snapshot
+    const [latestVersion] = await db
+      .select()
+      .from(workflowVersions)
+      .where(eq(workflowVersions.workflowId, workflow.id))
+      .orderBy(desc(workflowVersions.versionNumber))
+      .limit(1);
+
+    const nodes = (latestVersion ? (latestVersion.snapshot as any).nodes : workflow.nodes) as any[];
+    const edges = (latestVersion ? (latestVersion.snapshot as any).edges : workflow.edges) as any[];
     const rootNodes = findRootNodes(nodes, edges);
 
     if (rootNodes.length === 0) {
       return reply.badRequest(`Workflow ${workflowId} has no root trigger node.`);
     }
 
+    const payload = {
+      body: req.body || {},
+      query: req.query || {},
+      headers: {
+        'content-type': req.headers['content-type'],
+        'user-agent': req.headers['user-agent'],
+      },
+      receivedAt: new Date().toISOString(),
+    };
+
     // Create execution run
     const [run] = await db
       .insert(executionRuns)
       .values({
         workflowId: workflow.id,
+        workflowVersionId: latestVersion ? latestVersion.id : null,
         status: 'running',
         triggerType: 'webhook',
-        triggerPayload: (req.body as any) || {},
+        triggerPayload: payload,
         startedAt: new Date(),
       })
       .returning();
@@ -156,15 +258,66 @@ export async function buildServer() {
         runId: run.id,
         nodeId: root.id,
         status: 'queued',
-        inputPayload: req.body || {},
+        inputPayload: payload,
       });
     }
 
     return reply.status(202).send({
       message: 'Workflow execution triggered successfully.',
       runId: run.id,
+      workflowVersion: latestVersion ? latestVersion.versionNumber : 'draft',
       queuedNodes: rootNodes.map((n) => n.id),
     });
+  });
+
+  // Dead-Letter Queue (DLQ) Management
+  server.get('/api/dlq', async () => {
+    const dlqSteps = await db
+      .select()
+      .from(executionSteps)
+      .where(eq(executionSteps.status, 'dlq'))
+      .orderBy(desc(executionSteps.updatedAt))
+      .limit(100);
+
+    return { data: dlqSteps, totalCount: dlqSteps.length };
+  });
+
+  server.post('/api/dlq/replay/:stepId', async (req, reply) => {
+    const { stepId } = req.params as { stepId: string };
+    const [step] = await db.select().from(executionSteps).where(eq(executionSteps.id, stepId));
+
+    if (!step) {
+      return reply.notFound(`DLQ step ${stepId} not found.`);
+    }
+
+    // Reset step to queued state with fresh attempt counter
+    const [replayed] = await db
+      .update(executionSteps)
+      .set({
+        status: 'queued',
+        attempt: 1,
+        workerId: null,
+        leasedAt: null,
+        leasedUntil: null,
+        error: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(executionSteps.id, stepId))
+      .returning();
+
+    // Ensure parent execution run is marked as running
+    await db
+      .update(executionRuns)
+      .set({
+        status: 'running',
+        completedAt: null,
+      })
+      .where(eq(executionRuns.id, step.runId));
+
+    return {
+      message: `Step ${stepId} replayed from DLQ successfully.`,
+      data: replayed,
+    };
   });
 
   // Execution Runs
